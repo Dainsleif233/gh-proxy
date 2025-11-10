@@ -38,7 +38,7 @@ export default async (req: Request) => {
     const domain = req.headers.get('host') || url.host;
     url.host = domain;
 
-    const blockedPaths = ['/login', '/signin', '/signup', '/copilot'];
+    const blockedPaths = ['/', '/login', '/signin', '/signup', '/copilot'];
     if (blockedPaths.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))) {
         return new Response(null, {
             status: 301,
@@ -127,6 +127,10 @@ export default async (req: Request) => {
         if (!skipRespHeaders.includes(lk))
             respHeaders.set(k, v);
     });
+
+    if ([204, 205, 304].includes(response.status)) {
+        return new Response(null, { headers: respHeaders, status: response.status });
+    }
 
     const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('text/') || 
