@@ -20,24 +20,16 @@ const domainMap = {
 }
 
 const Resp = {
-    options: new Response(
-        null,
-        {
-            status: 204,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-                'Access-Control-Allow-Headers': '*',
-                'Access-Control-Max-Age': '86400'
-            }
+    options: new Response(null, {
+        status: 204,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+            'Access-Control-Allow-Headers': '*',
+            'Access-Control-Max-Age': '86400'
         }
-    ),
-    notFound: new Response(
-        null,
-        {
-            status: 404
-        }
-    )
+    }),
+    notFound: new Response(null, { status: 404 })
 }
 
 export default async (req: Request) => {
@@ -45,6 +37,16 @@ export default async (req: Request) => {
     const url = new URL(req.url);
     const domain = req.headers.get('host') || url.host;
     url.host = domain;
+
+    const blockedPaths = ['/login', '/signin', '/signup', '/copilot'];
+    if (blockedPaths.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))) {
+        return new Response(null, {
+            status: 301,
+            headers: {
+                'Location': '/404'
+            }
+        });
+    }
 
     if (req.method === 'OPTIONS') return Resp.options;
 
@@ -66,7 +68,7 @@ export default async (req: Request) => {
     const headers = new Headers();
 
     const skipHeaders = ['host', 'connection', 'x-forwarded-', 'x-nf-'];
-    for (const [k, v] of Object.entries(req.headers))
+    for (const [k, v] of req.headers.entries())
         if (!skipHeaders.some(skip => k.toLowerCase().startsWith(skip)))
             headers.set(k, v);
     headers.set('Host', origin);
