@@ -19,6 +19,30 @@ const domainMap = {
     'github.community': 'community.gh.'
 }
 
+const NO_BODY_STATUS_CODES = [204, 205, 304];
+const REDIRECT_STATUS_CODES = [301, 302, 303, 307, 308];
+const TEXT_CONTENT_TYPES = ['text/', 'application/json', 'application/javascript', 'application/xml'];
+const SKIP_REQUEST_HEADERS = ['host', 'connection', 'x-forwarded-', 'x-nf-'];
+const SKIP_RESPONSE_HEADERS = [
+    'content-encoding',
+    'content-length',
+    'content-security-policy',
+    'content-security-policy-report-only',
+    'clear-site-data',
+    'connection',
+    'transfer-encoding'
+];
+
+const regexCache = new Map<string, RegExp>();
+
+function getRegex(pattern: string, flags = 'g'): RegExp {
+    const key = `${pattern}:${flags}`;
+    if (!regexCache.has(key)) {
+        regexCache.set(key, new RegExp(pattern, flags));
+    }
+    return regexCache.get(key)!;
+}
+
 const Resp = {
     options: new Response(null, {
         status: 204,
@@ -29,126 +53,118 @@ const Resp = {
             'Access-Control-Max-Age': '86400'
         }
     }),
-    notFound: new Response(null, { status: 404 })
+    notFound: new Response(null, { status: 404 }),
+    error: (message: string) => new Response(JSON.stringify({ error: message }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+    })
 }
 
 export default async (req: Request) => {
+    try {
+        const url = new URL(req.url);
+        const domain = req.headers.get('host') || url.host;
+        url.host = domain;
 
-    const url = new URL(req.url);
-    const domain = req.headers.get('host') || url.host;
-    url.host = domain;
+        const blockedPaths = ['/', '/login', '/signin', '/signup', '/copilot'];
+        if (blockedPaths.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))) {
+            return new Response(null, {
+                status: 301,
+                headers: {
+                    'Location': '/404'
+                }
+            });
+        }
 
-    const blockedPaths = ['/', '/login', '/signin', '/signup', '/copilot'];
-    if (blockedPaths.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))) {
-        return new Response(null, {
-            status: 301,
-            headers: {
-                'Location': '/404'
+        if (req.method === 'OPTIONS') return Resp.options;
+
+        let origin = '', prefix = '';
+        for (const [k, v] of Object.entries(domainMap)) {
+            if (domain.startsWith(v)) {
+                origin = k;
+                prefix = v;
+                break;
+            }
+        }
+
+        if (!origin) return Resp.notFound;
+
+        let pathname = url.pathname;
+        pathname = pathname.replace(/(\/[^\/]+\/[^\/]+\/(?:latest-commit|tree-commit-info)\/[^\/]+)\/https%3A\/\/[^\/]+\/.*/, '$1');
+        pathname = pathname.replace(/(\/[^\/]+\/[^\/]+\/(?:latest-commit|tree-commit-info)\/[^\/]+)\/https:\/\/[^\/]+\/.*/, '$1');
+
+        const originUrl = new URL(`https://${origin}${pathname}${url.search}`);
+        const headers = new Headers();
+
+        for (const [k, v] of req.headers.entries()) {
+            if (!SKIP_REQUEST_HEADERS.some(skip => k.toLowerCase().startsWith(skip))) {
+                headers.set(k, v);
+            }
+        }
+        headers.set('Host', origin);
+        headers.set('Referer', originUrl.href);
+
+        const data: RequestInit = {
+            method: req.method,
+            headers: headers,
+            redirect: 'manual'
+        }
+
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+            data.body = req.body;
+        }
+
+        const response = await fetch(originUrl.href, data);
+
+        if (REDIRECT_STATUS_CODES.includes(response.status)) {
+            const originLocation = response.headers.get('location');
+            if (originLocation) {
+                let location = originLocation;
+                const suffix = url.host.substring(prefix.length);
+                for (const [k, v] of Object.entries(domainMap)) {
+                    const proxy = `${v}${suffix}`;
+                    location = location.replaceAll(k, proxy);
+                }
+                return Response.redirect(location, response.status);
+            }
+        }
+
+        const respHeaders = new Headers();
+        respHeaders.set('Access-Control-Allow-Origin', '*');
+        respHeaders.set('Access-Control-Allow-Credentials', 'true');
+
+        if (['GET', 'HEAD'].includes(req.method) && response.ok) {
+            respHeaders.set('Cache-Control', 'public, max-age=14400');
+        } else {
+            respHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+
+        response.headers.forEach((v, k) => {
+            const lk = k.toLowerCase();
+            if (!SKIP_RESPONSE_HEADERS.includes(lk)) {
+                respHeaders.set(k, v);
             }
         });
-    }
 
-    if (req.method === 'OPTIONS') return Resp.options;
-
-    let origin = '', prefix = '';
-    for (const [k, v] of Object.entries(domainMap))
-        if (domain.startsWith(v)) {
-            origin = k;
-            prefix = v;
-            break;
+        if (NO_BODY_STATUS_CODES.includes(response.status)) {
+            return new Response(null, { headers: respHeaders, status: response.status });
         }
 
-    if (!origin) return Resp.notFound;
-
-    let pathname = url.pathname;
-    pathname = pathname.replace(/(\/[^\/]+\/[^\/]+\/(?:latest-commit|tree-commit-info)\/[^\/]+)\/https%3A\/\/[^\/]+\/.*/, '$1');
-    pathname = pathname.replace(/(\/[^\/]+\/[^\/]+\/(?:latest-commit|tree-commit-info)\/[^\/]+)\/https:\/\/[^\/]+\/.*/, '$1');
-
-    const originUrl = new URL(`https://${origin}${pathname}${url.search}`);
-    const headers = new Headers();
-
-    const skipHeaders = ['host', 'connection', 'x-forwarded-', 'x-nf-'];
-    for (const [k, v] of req.headers.entries())
-        if (!skipHeaders.some(skip => k.toLowerCase().startsWith(skip)))
-            headers.set(k, v);
-    headers.set('Host', origin);
-    headers.set('Referer', originUrl.href);
-
-    const data: {
-        method: string,
-        headers: Headers,
-        redirect: RequestRedirect,
-        body?: ReadableStream<Uint8Array<ArrayBuffer>> | null
-    } = {
-        method: req.method,
-        headers: headers,
-        redirect: 'manual'
-    }
-
-    if (req.method !== 'GET' && req.method !== 'HEAD')
-        data.body = req.body;
-
-    const response = await fetch(originUrl.href, data);
-
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-        const originLocation = response.headers.get('location');
-        if (originLocation) {
-            let location = originLocation;
-            for (const [k, v] of Object.entries(domainMap)) {
-                if (originLocation.includes(k)) {
-                    const suffix = url.host.substring(prefix.length);
-                    const proxy = `${v}${suffix}`;
-                    location = originLocation.replace(k, proxy);
-                    break;
-                }
-            }
-            return Response.redirect(location, response.status);
-        }
-    }
-
-
-    const respHeaders = new Headers();
-    respHeaders.set('Access-Control-Allow-Origin', '*');
-    respHeaders.set('Access-Control-Allow-Credentials', 'true');
-    respHeaders.set('Cache-Control', 'public, max-age=14400');
-
-    const skipRespHeaders = [
-        'content-encoding',
-        'content-length',
-        'content-security-policy',
-        'content-security-policy-report-only',
-        'clear-site-data',
-        'connection',
-        'transfer-encoding'
-    ]
-
-    response.headers.forEach((v, k) => {
-        const lk = k.toLowerCase();
-        if (!skipRespHeaders.includes(lk))
-            respHeaders.set(k, v);
-    });
-
-    if ([204, 205, 304].includes(response.status)) {
-        return new Response(null, { headers: respHeaders, status: response.status });
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('text/') || 
-            contentType.includes('application/json') || 
-            contentType.includes('application/javascript') || 
-            contentType.includes('application/xml')) {
+        const contentType = response.headers.get('content-type') || '';
+        if (TEXT_CONTENT_TYPES.some(type => contentType.includes(type))) {
             const respBody = await modifyResponse(response.clone(), prefix, url.host);
-
             return new Response(respBody, { headers: respHeaders, status: response.status });
         } else {
             const buffer = await response.arrayBuffer();
-
             return new Response(buffer, { headers: respHeaders, status: response.status });
         }
+    } catch (error) {
+        console.error('Proxy error:', error);
+        return Resp.error(error instanceof Error ? error.message : 'Proxy failed');
+    }
 }
 
 async function modifyResponse(response: Response, prefix: string, host: string) {
-
     let text = await response.text();
     const suffix = host.substring(prefix.length);
 
@@ -156,22 +172,16 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
         const escapedDomain = original.replace(/\./g, '\\.');
         const proxyDomain = `${proxy}${suffix}`;
 
-        text = text.replace(
-            new RegExp(`https?://${escapedDomain}(?=/|"|'|\\s|$)`, 'g'),
-            `https://${proxyDomain}`
-        );
+        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
+        const protocollessRegex = getRegex(`//${escapedDomain}(?=/|"|'|\\s|$)`);
         
-        text = text.replace(
-            new RegExp(`//${escapedDomain}(?=/|"|'|\\s|$)`, 'g'),
-            `//${proxyDomain}`
-        );
+        text = text.replace(httpRegex, `https://${proxyDomain}`);
+        text = text.replace(protocollessRegex, `//${proxyDomain}`);
     }
 
     if (prefix === 'gh.') {
-        text = text.replace(
-            /(?<=["'])\/(?!\/|[a-zA-Z]+:)/g,
-            `https://${host}/`
-        );
+        const relativePathRegex = getRegex(`(?<=["'])\\/(?!\\/|[a-zA-Z]+:)`);
+        text = text.replace(relativePathRegex, `https://${host}/`);
     }
 
     return text;
