@@ -191,10 +191,7 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
         const escapedDomain = original.replace(/\./g, '\\.');
         const cdnUrl = `//cdn.syshub.top/https://${original}`;
 
-        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
         const protocollessRegex = getRegex(`//${escapedDomain}(?=/|"|'|\\s|$)`);
-        
-        text = text.replace(httpRegex, `https:${cdnUrl}`);
         text = text.replace(protocollessRegex, cdnUrl);
     }
 
@@ -202,10 +199,7 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
         const escapedDomain = original.replace(/\./g, '\\.');
         const cdnUrl = `//proxy.syshub.top/https://${original}`;
 
-        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
         const protocollessRegex = getRegex(`//${escapedDomain}(?=/|"|'|\\s|$)`);
-        
-        text = text.replace(httpRegex, `https:${cdnUrl}`);
         text = text.replace(protocollessRegex, cdnUrl);
     }
 
