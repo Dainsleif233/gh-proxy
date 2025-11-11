@@ -1,23 +1,32 @@
-const domainMap = {
+const DOMAINS = {
     'github.com': 'gh.',
     'avatars.githubusercontent.com': 'avatars.gh.',
-    'github.githubassets.com': 'assets.gh.',
     'collector.github.com': 'collector.gh.',
     'api.github.com': 'api.gh.',
-    'raw.githubusercontent.com': 'raw.gh.',
-    'gist.githubusercontent.com': 'gist.gh.',
     'github.io': 'io.gh.',
-    'assets-cdn.github.com': 'cdn.gh.',
-    'cdn.jsdelivr.net': 'jsdelivr.gh.',
+    'gist.github.com': 'gist.gh.',
     'securitylab.github.com': 'security.gh.',
     'www.githubstatus.com': 'status.gh.',
-    'npmjs.com': 'npmjs.gh.',
-    'git-lfs.github.com': 'lfs.gh.',
-    'githubusercontent.com': 'usercontent.gh.',
-    'github.global.ssl.fastly.net': 'fastly.gh.',
     'api.npms.io': 'npms.gh.',
     'github.community': 'community.gh.'
 }
+
+const CDN_DOMAINS = [
+    'github.githubassets.com',
+    'assets-cdn.github.com',
+    'cdn.jsdelivr.net',
+    'npmjs.com',
+    'github.global.ssl.fastly.net'
+]
+
+const FILE_DOMAINS = [
+    'raw.githubusercontent.com',
+    'gist.githubusercontent.com',
+    'git-lfs.github.com',
+    'githubusercontent.com'
+]
+
+const BLOCKED_PATHS = ['/', '/login', '/signin', '/signup', '/copilot', '/github-copilot'];
 
 const NO_BODY_STATUS_CODES = [204, 205, 304];
 const REDIRECT_STATUS_CODES = [301, 302, 303, 307, 308];
@@ -66,8 +75,7 @@ export default async (req: Request) => {
         const domain = req.headers.get('host') || url.host;
         url.host = domain;
 
-        const blockedPaths = ['/', '/login', '/signin', '/signup', '/copilot'];
-        if (blockedPaths.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))) {
+        if (BLOCKED_PATHS.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))) {
             return new Response(null, {
                 status: 301,
                 headers: {
@@ -79,7 +87,7 @@ export default async (req: Request) => {
         if (req.method === 'OPTIONS') return Resp.options;
 
         let origin = '', prefix = '';
-        for (const [k, v] of Object.entries(domainMap)) {
+        for (const [k, v] of Object.entries(DOMAINS)) {
             if (domain.startsWith(v)) {
                 origin = k;
                 prefix = v;
@@ -121,7 +129,7 @@ export default async (req: Request) => {
             if (originLocation) {
                 let location = originLocation;
                 const suffix = url.host.substring(prefix.length);
-                for (const [k, v] of Object.entries(domainMap)) {
+                for (const [k, v] of Object.entries(DOMAINS)) {
                     const proxy = `${v}${suffix}`;
                     location = location.replaceAll(k, proxy);
                 }
@@ -168,7 +176,7 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
     let text = await response.text();
     const suffix = host.substring(prefix.length);
 
-    for (const [original, proxy] of Object.entries(domainMap)) {
+    for (const [original, proxy] of Object.entries(DOMAINS)) {
         const escapedDomain = original.replace(/\./g, '\\.');
         const proxyDomain = `${proxy}${suffix}`;
 
@@ -177,6 +185,28 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
         
         text = text.replace(httpRegex, `https://${proxyDomain}`);
         text = text.replace(protocollessRegex, `//${proxyDomain}`);
+    }
+
+    for (const original of CDN_DOMAINS) {
+        const escapedDomain = original.replace(/\./g, '\\.');
+        const cdnUrl = `//cdn.syshub.top/https://${original}`;
+
+        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
+        const protocollessRegex = getRegex(`//${escapedDomain}(?=/|"|'|\\s|$)`);
+        
+        text = text.replace(httpRegex, `https:${cdnUrl}`);
+        text = text.replace(protocollessRegex, cdnUrl);
+    }
+
+    for (const original of FILE_DOMAINS) {
+        const escapedDomain = original.replace(/\./g, '\\.');
+        const cdnUrl = `//proxy.syshub.top/https://${original}`;
+
+        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
+        const protocollessRegex = getRegex(`//${escapedDomain}(?=/|"|'|\\s|$)`);
+        
+        text = text.replace(httpRegex, `https:${cdnUrl}`);
+        text = text.replace(protocollessRegex, cdnUrl);
     }
 
     if (prefix === 'gh.') {
