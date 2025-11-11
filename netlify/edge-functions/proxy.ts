@@ -1,33 +1,25 @@
 const DOMAINS = {
     'github.com': 'gh.',
     'avatars.githubusercontent.com': 'avatars.gh.',
+    'github.githubassets.com': 'assets.gh.',
     'collector.github.com': 'collector.gh.',
     'api.github.com': 'api.gh.',
+    'raw.githubusercontent.com': 'raw.gh.',
+    'gist.githubusercontent.com': 'gist.gh.',
     'github.io': 'io.gh.',
-    'gist.github.com': 'gist.gh.',
+    'assets-cdn.github.com': 'cdn.gh.',
+    'cdn.jsdelivr.net': 'jsdelivr.gh.',
     'securitylab.github.com': 'security.gh.',
     'www.githubstatus.com': 'status.gh.',
+    'npmjs.com': 'npmjs.gh.',
+    'git-lfs.github.com': 'lfs.gh.',
+    'githubusercontent.com': 'usercontent.gh.',
+    'github.global.ssl.fastly.net': 'fastly.gh.',
     'api.npms.io': 'npms.gh.',
     'github.community': 'community.gh.'
 }
 
-const CDN_DOMAINS = [
-    'github.githubassets.com',
-    'assets-cdn.github.com',
-    'cdn.jsdelivr.net',
-    'npmjs.com',
-    'github.global.ssl.fastly.net'
-]
-
-const FILE_DOMAINS = [
-    'raw.githubusercontent.com',
-    'gist.githubusercontent.com',
-    'git-lfs.github.com',
-    'githubusercontent.com'
-]
-
-const BLOCKED_PATHS = ['/', '/login', '/signin', '/signup', '/copilot', '/github-copilot'];
-
+const BLOCKED_PATHS = ['/', '/login', '/signin', '/signup', '/copilot', 'github-copilot'];
 const NO_BODY_STATUS_CODES = [204, 205, 304];
 const REDIRECT_STATUS_CODES = [301, 302, 303, 307, 308];
 const TEXT_CONTENT_TYPES = ['text/', 'application/json', 'application/javascript', 'application/xml'];
@@ -187,26 +179,17 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
         text = text.replace(protocollessRegex, `//${proxyDomain}`);
     }
 
-    for (const original of CDN_DOMAINS) {
-        const escapedDomain = original.replace(/\./g, '\\.');
-        const cdnUrl = `//cdn.syshub.top/https://${original}`;
-
-        const protocollessRegex = getRegex(`//${escapedDomain}(?=/|"|'|\\s|$)`);
-        text = text.replace(protocollessRegex, cdnUrl);
-    }
-
-    for (const original of FILE_DOMAINS) {
-        const escapedDomain = original.replace(/\./g, '\\.');
-        const cdnUrl = `//proxy.syshub.top/https://${original}`;
-
-        const protocollessRegex = getRegex(`//${escapedDomain}(?=/|"|'|\\s|$)`);
-        text = text.replace(protocollessRegex, cdnUrl);
-    }
-
     if (prefix === 'gh.') {
         const relativePathRegex = getRegex(`(?<=["'])\\/(?!\\/|[a-zA-Z]+:)`);
         text = text.replace(relativePathRegex, `https://${host}/`);
     }
+
+    const escapedDomain = `gh.${suffix}`.replace(/\./g, '\\.');
+    const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
+    const releaseRegex = getRegex(`https?://${escapedDomain}/([^/]+)/([^/]+)/releases/(?:download|latest/download)/([^/?#]+)/([^/?#]+)`);
+    text = text.replace(releaseRegex, match =>
+        match.replace(httpRegex, `https://proxy.syshub.top/https://gh.${suffix}`)
+    );
 
     return text;
 }
