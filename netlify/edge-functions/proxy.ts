@@ -188,7 +188,7 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
     const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
     const releaseRegex = getRegex(`https?://${escapedDomain}/([^/]+)/([^/]+)/releases/(?:download|latest/download)/([^/?#]+)/([^/?#]+)`);
     text = text.replace(releaseRegex, match =>
-        match.replace(httpRegex, `https://proxy.syshub.top/https://gh.${suffix}`)
+        match.replace(httpRegex, `https://proxy.syshub.top/https://github.com`)
     );
 
     return text;
