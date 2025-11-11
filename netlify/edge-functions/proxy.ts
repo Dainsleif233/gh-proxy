@@ -19,7 +19,7 @@ const DOMAINS = {
     'github.community': 'community.gh.'
 }
 
-const BLOCKED_PATHS = ['/', '/login', '/signin', '/signup', '/copilot', 'github-copilot'];
+const BLOCKED_PATHS = ['/', '/login', '/signin', '/signup', '/copilot', '/github-copilot', '/session'];
 const NO_BODY_STATUS_CODES = [204, 205, 304];
 const REDIRECT_STATUS_CODES = [301, 302, 303, 307, 308];
 const TEXT_CONTENT_TYPES = ['text/', 'application/json', 'application/javascript', 'application/xml'];
