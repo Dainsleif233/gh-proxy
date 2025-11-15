@@ -181,20 +181,20 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
 
     {
         const escapedDomain = `gh.${suffix}`.replace(/\./g, '\\.');
+        const proxyUrl = 'https://proxy.syshub.top/https://github.com';
         const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
-        const releaseRegex = getRegex(`https?://${escapedDomain}/([^/]+)/([^/]+)/releases/download/`);
-        text = text.replace(releaseRegex, match =>
-            match.replace(httpRegex, `https://proxy.syshub.top/https://github.com`)
-        );
-    }
 
-    {
-        const escapedDomain = `gh.${suffix}`.replace(/\./g, '\\.');
-        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
-        const releaseRegex = getRegex(`https?://${escapedDomain}/([^/]+)/([^/]+)/archive/refs/(tags|heads)/`);
-        text = text.replace(releaseRegex, match =>
-            match.replace(httpRegex, `https://proxy.syshub.top/https://github.com`)
-        );
+        const releaseRegex = getRegex(`https?://${escapedDomain}/(?:[^/]+)/(?:[^/]+)/releases/(?:download|latest/download)/`);
+        text = text.replace(releaseRegex, match => match.replace(httpRegex, proxyUrl));
+        const archiveRegex = getRegex(`https?://${escapedDomain}/(?:[^/]+)/(?:[^/]+)/archive/refs/(?:tags|heads)/`);
+        text = text.replace(archiveRegex, match => match.replace(httpRegex, proxyUrl));
+
+        if (prefix === 'gh.') {
+            const releaseRegex = getRegex(`(?:'|")/(?:?!/)(?:[^/]+)/(?:[^/]+)/releases/download/`);
+            text = text.replace(releaseRegex, match => proxyUrl + match);
+            const archiveRegex = getRegex(`(?:'|")/(?:?!/)(?:[^/]+)/(?:[^/]+)/archive/refs/(?:tags|heads)/`);
+            text = text.replace(archiveRegex, match => proxyUrl + match);
+        }
     }
 
     return text;
