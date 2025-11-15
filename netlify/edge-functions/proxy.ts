@@ -190,9 +190,9 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
         text = text.replace(archiveRegex, match => match.replace(httpRegex, proxyUrl));
 
         if (prefix === 'gh.') {
-            const releaseRegex = getRegex(`(?:'|")/(?:?!/)(?:[^/]+)/(?:[^/]+)/releases/download/`);
+            const releaseRegex = getRegex(`(?:'|")/(?!/)(?:[^/]+)/(?:[^/]+)/releases/download/`);
             text = text.replace(releaseRegex, match => proxyUrl + match);
-            const archiveRegex = getRegex(`(?:'|")/(?:?!/)(?:[^/]+)/(?:[^/]+)/archive/refs/(?:tags|heads)/`);
+            const archiveRegex = getRegex(`(?:'|")/(?!/)(?:[^/]+)/(?:[^/]+)/archive/refs/(?:tags|heads)/`);
             text = text.replace(archiveRegex, match => proxyUrl + match);
         }
     }
