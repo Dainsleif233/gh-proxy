@@ -179,17 +179,23 @@ async function modifyResponse(response: Response, prefix: string, host: string) 
         text = text.replace(protocollessRegex, `//${proxyDomain}`);
     }
 
-    if (prefix === 'gh.') {
-        const relativePathRegex = getRegex(`(?<=["'])\\/(?!\\/|[a-zA-Z]+:)`);
-        text = text.replace(relativePathRegex, `https://${host}/`);
+    {
+        const escapedDomain = `gh.${suffix}`.replace(/\./g, '\\.');
+        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
+        const releaseRegex = getRegex(`https?://${escapedDomain}/([^/]+)/([^/]+)/releases/download/`);
+        text = text.replace(releaseRegex, match =>
+            match.replace(httpRegex, `https://proxy.syshub.top/https://github.com`)
+        );
     }
 
-    const escapedDomain = `gh.${suffix}`.replace(/\./g, '\\.');
-    const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
-    const releaseRegex = getRegex(`https?://${escapedDomain}/([^/]+)/([^/]+)/releases/(?:download|latest/download)/([^/?#]+)/([^/?#]+)`);
-    text = text.replace(releaseRegex, match =>
-        match.replace(httpRegex, `https://proxy.syshub.top/https://github.com`)
-    );
+    {
+        const escapedDomain = `gh.${suffix}`.replace(/\./g, '\\.');
+        const httpRegex = getRegex(`https?://${escapedDomain}(?=/|"|'|\\s|$)`);
+        const releaseRegex = getRegex(`https?://${escapedDomain}/([^/]+)/([^/]+)/archive/refs/(tags|heads)/`);
+        text = text.replace(releaseRegex, match =>
+            match.replace(httpRegex, `https://proxy.syshub.top/https://github.com`)
+        );
+    }
 
     return text;
 }
