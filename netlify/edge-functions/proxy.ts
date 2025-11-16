@@ -5,18 +5,20 @@ const DOMAINS = {
     'collector.github.com': 'collector.gh.',
     'api.github.com': 'api.gh.',
     'raw.githubusercontent.com': 'raw.gh.',
-    'gist.githubusercontent.com': 'gist.gh.',
+    'gist.githubusercontent.com': 'gistraw.gh.',
     'github.io': 'io.gh.',
-    'assets-cdn.github.com': 'cdn.gh.',
-    'cdn.jsdelivr.net': 'jsdelivr.gh.',
-    'securitylab.github.com': 'security.gh.',
-    'www.githubstatus.com': 'status.gh.',
-    'npmjs.com': 'npmjs.gh.',
+    // 'assets-cdn.github.com': 'cdn.gh.',
+    // 'cdn.jsdelivr.net': 'jsdelivr.gh.',
+    // 'securitylab.github.com': 'security.gh.',
+    // 'www.githubstatus.com': 'status.gh.',
+    // 'npmjs.com': 'npmjs.gh.',
+    // 'github.global.ssl.fastly.net': 'fastly.gh.',
+    // 'api.npms.io': 'npms.gh.',
     'git-lfs.github.com': 'lfs.gh.',
     'githubusercontent.com': 'usercontent.gh.',
-    'github.global.ssl.fastly.net': 'fastly.gh.',
-    'api.npms.io': 'npms.gh.',
-    'github.community': 'community.gh.'
+    'github.community': 'community.gh.',
+    'gist.github.com': 'gist.gh.',
+    'github.blog': 'blog.gh.'
 }
 
 const BLOCKED_PATHS = ['/', '/login', '/signin', '/signup', '/copilot', '/github-copilot', '/session'];
